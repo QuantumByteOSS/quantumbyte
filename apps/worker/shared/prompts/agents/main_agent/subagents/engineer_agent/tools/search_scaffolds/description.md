@@ -1,0 +1,1 @@
+Search the scaffold catalog by natural-language query. Returns matching scaffold slugs ranked by relevance; pair with inject_scaffold to vendor each match into the workspace.

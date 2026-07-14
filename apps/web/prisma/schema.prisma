@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ProjectStatus {
+  ACTIVE
+  HIDE
+  NOT_ACTIVE
+}
+
+enum GenerationStatus {
+  DRAFT
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model Project {
+  id               String           @id
+  title            String?
+  desc             String?
+  logo             String?
+  prompt           String?
+  status           ProjectStatus    @default(NOT_ACTIVE)
+  generationStatus GenerationStatus @default(DRAFT)
+  harnessRunning   Boolean          @default(false)
+  // Set true by the "Run harness" button (POST /harness/run); the worker claims it,
+  // flips it back to false, and runs the harness. Separate from harnessRunning so a
+  // request survives until a worker actually picks it up.
+  harnessRunRequested Boolean       @default(false)
+  agentSessionId   String?
+  assignedWorker   String? // affinity pin — soft pointer to Worker.id (RFC 0003), not an FK
+  // Idle TTL for the affinity pin. Orchestrator sets/refreshes it on assignment, the
+  // worker refreshes it after each completed activity; the orchestrator unpins the
+  // project once it passes with no turn in flight. NULL only when assignedWorker is.
+  affinityExpiresAt DateTime?
+  // App-preview port on the worker host (localhost for now). Allocated by the
+  // orchestrator together with the affinity pin, served by the pinned worker's
+  // preview dev-server, and cleared whenever the pin drops — port lifetime IS
+  // affinity lifetime. NULL only when assignedWorker is.
+  previewPort Int?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  requirements HarnessRequirement[]
+  chatMessages ChatMessage[]
+  assets       Asset[]
+
+  @@index([updatedAt(sort: Desc)])
+}
+
+// Agent-generated assets (logos, images) stored in S3/minio. The worker's
+// qb-designer MCP tools create/list/delete these; the public direct URL is
+// embedded in slides + rendered on the FE.
+model Asset {
+  id               String   @id
+  projectId        String
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  filename         String // stored S3 key basename
+  originalFilename String?
+  url              String // public direct URL
+  size             Int
+  mimeType         String
+  createdAt        DateTime @default(now())
+
+  @@index([projectId, createdAt])
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+enum ChatMessageStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model ChatMessage {
+  id             String            @id
+  projectId      String
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  role           ChatRole
+  content        String
+  thinking       String? // streamed extended-thinking / reasoning text (worker fills it live)
+  // Pipeline stage while the turn is PROCESSING (USER rows only, worker-written):
+  // AGENT → RECONCILING → COMMITTING. Pure UI affordance streamed over SSE.
+  stage          String?
+  // Live tool activity ("Editing page.tsx", "Running npm install") — ASSISTANT
+  // rows only, worker-written from the SDK's ToolUseBlocks while streaming.
+  activity       String?
+  // Full activity timeline for the turn: [{at: ISO string, text: string}, …].
+  // `activity` is always the last entry; this is the history the FE renders as
+  // the "working…" step feed (and keeps as a collapsed recap after the turn).
+  activityLog    Json?
+  status         ChatMessageStatus @default(COMPLETED)
+  assignedWorker String? // set by orchestrator; worker claims rows matching its id (RFC 0003)
+  // Lease held by the worker running this turn: set on claim, renewed while the
+  // turn is in flight, and the ONLY staleness signal the orchestrator may use to
+  // requeue a PROCESSING row. Never key staleness off createdAt — it does not
+  // advance, so any turn outliving the timeout would be requeued on every tick
+  // forever and the agent would answer the same message over and over.
+  leaseExpiresAt DateTime?
+  // Claim count, incremented on every claim. A turn whose worker keeps dying is
+  // failed once it exhausts MAX_TURN_ATTEMPTS rather than requeued indefinitely.
+  attempts       Int               @default(0)
+  error          String?
+  createdAt      DateTime          @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([assignedWorker, status])
+  @@index([status])
+  @@index([status, leaseExpiresAt])
+}
+
+// Claude Agent SDK session transcript, one row per JSONL entry. Backs the
+// worker's PostgresSessionStore so any worker in the fleet can cold-resume a
+// project's session (the SDK's local-disk default can't cross hosts). RFC 0003.
+model AgentSessionEntry {
+  id         String   @id
+  projectKey String
+  sessionId  String
+  subpath    String? // branch; null = main session
+  seq        BigInt // append order within (projectKey, sessionId, subpath)
+  entry      Json // one SessionStoreEntry JSONL dict
+  createdAt  DateTime @default(now())
+
+  @@index([projectKey, sessionId, subpath, seq])
+}
+
+// Live worker registry (RFC 0003). Ephemeral: rows churn as instances start/stop.
+// `assignedWorker` on Project/ChatMessage points here by id but is NOT an FK.
+model Worker {
+  id        String   @id
+  lastSeen  DateTime @default(now())
+  createdAt DateTime @default(now())
+}
+
+enum RequirementType {
+  EXPLICIT
+  HIDDEN
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum HarnessResultValue {
+  SUCCESS
+  FAIL
+}
+
+enum HarnessRunStatus {
+  OK
+  INCONCLUSIVE
+}
+
+model HarnessRequirement {
+  id          String          @id
+  projectId   String
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  excerpt     String?
+  description String
+  type        RequirementType @default(EXPLICIT)
+  severity    Severity        @default(MEDIUM)
+  // A user edited or created this requirement through the UI, claiming manual
+  // ownership. The worker's GENERATE pass treats a locked row as authoritative:
+  // it never overwrites or deletes it and derives around it, so a human curation
+  // survives the next product-overview-driven re-derivation. Cleared by "reset to
+  // auto", which hands the row back to automatic derivation.
+  locked      Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  result HarnessResult?
+
+  @@index([projectId])
+}
+
+model HarnessResult {
+  requirementId   String             @id
+  requirement     HarnessRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  result          HarnessResultValue?
+  evidence        String?
+  runStatus       HarnessRunStatus   @default(INCONCLUSIVE)
+  lastVerifiedSha String?
+  watchedPaths    String[]           @default([])
+  runAt           DateTime?
+  isStale         Boolean            @default(false)
+}

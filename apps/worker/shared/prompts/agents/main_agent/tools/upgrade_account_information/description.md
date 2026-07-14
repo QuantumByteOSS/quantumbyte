@@ -1,0 +1,1 @@
+Return upgrade information for the user's tier; fires a delayed soft-wall popup if FREE_TIER.

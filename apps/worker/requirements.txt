@@ -1,0 +1,8 @@
+claude-agent-sdk
+asyncpg
+python-dotenv
+python-ulid
+httpx
+aioboto3
+google-genai
+redis

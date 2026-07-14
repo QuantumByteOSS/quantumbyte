@@ -1,0 +1,1 @@
+Return the catalogue of QuantumByte UI elements the agent can target with highlight_and_tooltip / introduce_agent.

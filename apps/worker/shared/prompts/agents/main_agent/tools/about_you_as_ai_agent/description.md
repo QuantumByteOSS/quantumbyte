@@ -1,0 +1,1 @@
+Look up your own identity / QuantumByte platform info and return a short canned explanation. Call whenever the user asks who or what you are, what the platform or blueprint is, pricing, or how to reach support.

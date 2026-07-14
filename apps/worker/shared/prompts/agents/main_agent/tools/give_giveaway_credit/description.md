@@ -1,0 +1,1 @@
+Create a giveaway-credit record so the agent can render a one-shot Claim Credit button.

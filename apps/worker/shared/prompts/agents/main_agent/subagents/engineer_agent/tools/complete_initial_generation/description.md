@@ -1,0 +1,1 @@
+Finalize the initial app generation and return the celebrate/relay directive.

@@ -1,0 +1,1 @@
+Spotlight one UI element and render a bear-styled tooltip next to it.

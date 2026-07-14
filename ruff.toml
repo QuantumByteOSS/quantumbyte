@@ -1,0 +1,9 @@
+# Ruff config for the Python apps (orchestrator, worker).
+target-version = "py312"
+
+extend-exclude = [".venv", "apps/web"]
+
+[lint.per-file-ignores]
+# main.py must call load_dotenv() before importing local modules — they read
+# os.environ at import time, so module-level imports after code are intentional.
+"apps/worker/main.py" = ["E402"]

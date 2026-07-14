@@ -1,0 +1,1 @@
+List all environment variables for the deck in preview mode. Use this when the user asks about their env vars or configuration, or when diagnosing configuration issues. Takes no arguments — the deck is resolved from context.

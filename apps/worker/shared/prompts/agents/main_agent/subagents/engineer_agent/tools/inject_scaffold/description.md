@@ -1,0 +1,1 @@
+Inject a discovered scaffold into the workspace. search_query must be the exact query passed to search_scaffolds that returned this slug. Do not manually create top-level folders under app/modules/*; use this tool for that. You may edit/add subfolders inside injected modules (app/modules/<slug>/*).

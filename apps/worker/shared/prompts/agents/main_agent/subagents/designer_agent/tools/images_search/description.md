@@ -1,0 +1,1 @@
+Generate an image from a text prompt using AI image generation. The image is uploaded to the project's asset storage and returned as a public URL ready to embed in slides or set as the product logo. Pass `query` (what to generate) and optionally `count`.

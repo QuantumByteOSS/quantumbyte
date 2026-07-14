@@ -1,0 +1,69 @@
+# Local dev infra. Primary datastore: Postgres — the message table is the queue,
+# no broker (RFC 0001 / RFC 0003). Redis is added purely as a lightweight lock
+# store (the harness per-project run lock); the worker degrades open if it is down.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: quantumbyte
+      POSTGRES_PASSWORD: quantumbyte
+      POSTGRES_DB: quantumbyte
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quantumbyte"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Lock store for the worker's harness per-project run lock (redis_lock.py).
+  # NOT a broker — coordination still flows through Postgres (RFC 0003). Set the
+  # worker's REDIS_URL to redis://localhost:6379/0.
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # S3-compatible object store for agent-generated assets (logos, images). The
+  # worker uploads via aioboto3; the bucket is public-read so <img src> works.
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: quantumbyte
+      MINIO_ROOT_PASSWORD: quantumbyte
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # web console
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # One-shot: create the bucket and make it public-read, then exit.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 quantumbyte quantumbyte; do sleep 1; done;
+      mc mb --ignore-existing local/qb-assets;
+      mc anonymous set download local/qb-assets;
+      echo 'minio bucket qb-assets ready (public-read)';
+      "
+
+volumes:
+  pgdata:
+  miniodata:

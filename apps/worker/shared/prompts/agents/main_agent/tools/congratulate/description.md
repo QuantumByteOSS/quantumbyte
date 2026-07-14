@@ -1,0 +1,1 @@
+Fire a confetti animation on the user's screen to celebrate a milestone.

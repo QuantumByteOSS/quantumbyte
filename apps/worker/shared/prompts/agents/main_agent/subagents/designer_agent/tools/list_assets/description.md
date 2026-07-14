@@ -1,0 +1,1 @@
+List all assets (images, videos, documents, fonts) uploaded to the user's asset storage. Use this when the user asks about their uploaded files, images, or media. Takes no arguments — the project is resolved from context.
