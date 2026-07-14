@@ -20,7 +20,7 @@ Please include:
 
 ## What to expect
 
-QuantumByte is in a **pre-public founding phase** — treat these as targets, not a
+QuantumByte is a **young open-source project** — treat these as targets, not a
 contractual SLA:
 
 - **Acknowledgement:** within 3 business days.
