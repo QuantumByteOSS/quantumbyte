@@ -75,10 +75,9 @@ The current open-source release begins with explicit business requirements. Afte
 
 ### Prerequisites
 
-- Node.js and npm
-- Python 3
-- PostgreSQL
-- Redis
+- Docker and Docker Compose (Postgres, Redis, and minio run in containers)
+- Node.js 20+ and npm
+- Python 3.11+
 - An Anthropic API key for the current worker implementation
 
 ### Run locally
@@ -127,6 +126,7 @@ The builder and verifier are deliberately separated. The builder can edit the pr
 - **`apps/worker`**: agent execution, build loop, workspace management, and requirements harness using Python and the Claude Agent SDK
 - **PostgreSQL**: source of truth for projects, messages, workers, requirements, and verdicts
 - **Redis**: per-project harness locking
+- **minio**: S3-compatible store for agent-generated assets
 
 The current worker uses the Claude Agent SDK. Provider-neutral agent boundaries and additional model providers are on the roadmap.
 
