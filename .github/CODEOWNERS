@@ -1,3 +1,4 @@
-# Every PR automatically requests review from the maintainers below.
+# Every PR automatically requests review from the maintainers team.
 # Branch protection requires a code-owner approval before merge.
-* @QuantumByteOSS @Nael-Nathanael @oriastanjung
+# Team roster: https://github.com/orgs/QuantumByteOSS/teams/maintainers
+* @QuantumByteOSS/maintainers
