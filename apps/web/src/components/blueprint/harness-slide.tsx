@@ -18,6 +18,11 @@ import {
   XCircle,
 } from '@phosphor-icons/react';
 import { useMemo, useState } from 'react';
+import {
+  REQUIREMENT_SEVERITIES,
+  sortRequirementsBySeverity,
+  type RequirementSeverity,
+} from '@/lib/requirement-severity';
 import type { HarnessSnapshot } from './use-project-stream';
 
 type Requirement = {
@@ -25,7 +30,7 @@ type Requirement = {
   excerpt: string | null;
   description: string;
   type: 'explicit' | 'hidden';
-  severity: 'critical' | 'high' | 'medium' | 'low';
+  severity: RequirementSeverity;
   // True once a user has created or edited this row through the UI — it is then
   // manually owned and the worker's auto-derivation leaves it alone. "Reset to
   // auto" clears it.
@@ -48,8 +53,6 @@ type StagedOp =
   | { op: 'delete' };
 
 type Verdict = 'pass' | 'fail' | 'inconclusive' | 'unverified';
-
-const SEVERITIES = ['critical', 'high', 'medium', 'low'] as const;
 
 const SEVERITY_BADGE: Record<string, string> = {
   critical: 'bg-red-100 text-red-700',
@@ -189,7 +192,7 @@ function RequirementForm({
           onChange={(e) => setSeverity(e.target.value as Requirement['severity'])}
           className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
         >
-          {SEVERITIES.map((s) => (
+          {REQUIREMENT_SEVERITIES.map((s) => (
             <option key={s} value={s}>
               {s[0].toUpperCase() + s.slice(1)}
             </option>
@@ -281,13 +284,19 @@ export function HarnessSlide({
   }, [effective, verdicts]);
 
   const grouped = useMemo(
-    () =>
-      SEVERITIES.map((sev) => ({
+    () => {
+      const visible = sortRequirementsBySeverity(
+        effective.filter(
+          (requirement) =>
+            filter === 'all' || verdicts.get(requirement.id) === filter
+        )
+      );
+
+      return REQUIREMENT_SEVERITIES.map((sev) => ({
         sev,
-        items: effective.filter(
-          (r) => r.severity === sev && (filter === 'all' || verdicts.get(r.id) === filter)
-        ),
-      })).filter((g) => g.items.length > 0),
+        items: visible.filter((requirement) => requirement.severity === sev),
+      })).filter((group) => group.items.length > 0);
+    },
     [effective, filter, verdicts]
   );
 
